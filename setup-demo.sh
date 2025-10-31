@@ -40,6 +40,7 @@ command -v npm >/dev/null 2>&1 || { echo -e "${RED}✗ npm is required but not i
 command -v cargo >/dev/null 2>&1 || { echo -e "${RED}✗ Rust/Cargo is required but not installed. Aborting.${NC}" >&2; exit 1; }
 command -v near >/dev/null 2>&1 || { echo -e "${RED}✗ NEAR CLI is required but not installed. Aborting.${NC}" >&2; exit 1; }
 command -v wasm-opt >/dev/null 2>&1 || { echo -e "${RED}✗ wasm-opt (binaryen) is required but not installed. Install with: brew install binaryen${NC}" >&2; exit 1; }
+command -v rsync >/dev/null 2>&1 || { echo -e "${RED}✗ rsync is required but not installed. Aborting.${NC}" >&2; exit 1; }
 
 echo -e "${GREEN}✓ All dependencies installed${NC}"
 echo ""
@@ -66,7 +67,6 @@ echo -e "${GREEN}✓ Contract account created: $CONTRACT_ACCOUNT${NC}"
 
 # Request additional funds from faucet to ensure enough for node creation
 echo -e "${YELLOW}Requesting additional funds from faucet...${NC}"
-sleep 2
 curl -s -X POST "https://helper.nearprotocol.com/account" \
   -H "Content-Type: application/json" \
   -d "{\"newAccountId\":\"$CONTRACT_ACCOUNT\",\"newAccountPublicKey\":\"$(cat ~/.near-credentials/testnet/${CONTRACT_ACCOUNT}.json | jq -r '.public_key')\"}" || true
@@ -93,9 +93,15 @@ echo -e "${YELLOW}Step 7: Adding assets to contract...${NC}"
 
 near contract call-function as-transaction "$CONTRACT_ACCOUNT" add_asset json-args '{"asset":{"id":"near","symbol":"NEAR","name":"NEAR Protocol","decimals":4,"active":true,"min_sources":2}}' prepaid-gas '30.0 Tgas' attached-deposit '0 NEAR' sign-as "$CONTRACT_ACCOUNT" network-config testnet sign-with-keychain send
 
+
+
 near contract call-function as-transaction "$CONTRACT_ACCOUNT" add_asset json-args '{"asset":{"id":"bitcoin","symbol":"BTC","name":"Bitcoin","decimals":4,"active":true,"min_sources":2}}' prepaid-gas '30.0 Tgas' attached-deposit '0 NEAR' sign-as "$CONTRACT_ACCOUNT" network-config testnet sign-with-keychain send
 
+
+
 near contract call-function as-transaction "$CONTRACT_ACCOUNT" add_asset json-args '{"asset":{"id":"ethereum","symbol":"ETH","name":"Ethereum","decimals":4,"active":true,"min_sources":2}}' prepaid-gas '30.0 Tgas' attached-deposit '0 NEAR' sign-as "$CONTRACT_ACCOUNT" network-config testnet sign-with-keychain send
+
+
 
 near contract call-function as-transaction "$CONTRACT_ACCOUNT" add_asset json-args '{"asset":{"id":"usdc","symbol":"USDC","name":"USD Coin","decimals":4,"active":true,"min_sources":2}}' prepaid-gas '30.0 Tgas' attached-deposit '0 NEAR' sign-as "$CONTRACT_ACCOUNT" network-config testnet sign-with-keychain send
 
@@ -105,7 +111,10 @@ echo ""
 # Step 8: Approve code hash and attestation
 echo -e "${YELLOW}Step 8: Approving code hash and attestation...${NC}"
 
+
 near contract call-function as-transaction "$CONTRACT_ACCOUNT" approve_code_hash json-args "{\"code_hash\":\"$CONTRACT_HASH\"}" prepaid-gas '30.0 Tgas' attached-deposit '0 NEAR' sign-as "$CONTRACT_ACCOUNT" network-config testnet sign-with-keychain send
+
+
 
 near contract call-function as-transaction "$CONTRACT_ACCOUNT" approve_attestation json-args "{\"code_hash\":\"$CONTRACT_HASH\",\"mr_enclave\":\"dev_mr_enclave_v1\"}" prepaid-gas '30.0 Tgas' attached-deposit '0 NEAR' sign-as "$CONTRACT_ACCOUNT" network-config testnet sign-with-keychain send
 
@@ -134,15 +143,15 @@ for i in 1 2 3; do
     # Create oracle node directory
     NODE_DIR="$PROJECT_DIR/oracle-node-${i}"
     if [ ! -d "$NODE_DIR" ]; then
-        cp -r "$PROJECT_DIR/oracle-node" "$NODE_DIR"
+        # Copy oracle-node but exclude node_modules to avoid broken symlinks
+        mkdir -p "$NODE_DIR"
+        rsync -a --exclude 'node_modules' "$PROJECT_DIR/oracle-node/" "$NODE_DIR/"
     fi
 
-    # Install dependencies if needed
-    if [ ! -d "$NODE_DIR/node_modules" ]; then
-        echo -e "${YELLOW}Installing dependencies for node ${i}...${NC}"
-        cd "$NODE_DIR"
-        npm install > /dev/null 2>&1
-    fi
+    # Always install dependencies to ensure clean setup
+    echo -e "${YELLOW}Installing dependencies for node ${i}...${NC}"
+    cd "$NODE_DIR"
+    npm install > /dev/null 2>&1
 
     # Create .env file
     cat > "$NODE_DIR/.env" << EOF
