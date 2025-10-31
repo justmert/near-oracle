@@ -8,6 +8,8 @@ A hardware-secured price oracle system using Trusted Execution Environments (TEE
 
 ## Overview
 
+<img width="1024" alt="image" src="https://github.com/user-attachments/assets/c7957480-b0a5-4c0e-85f6-45d74cf25a1e" />
+
 This oracle system consists of three components:
 
 1. **Smart Contract** (Rust) - Manages price aggregation, node authorization, and governance
